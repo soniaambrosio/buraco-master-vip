@@ -6967,6 +6967,7 @@ module.exports = { criarServidor };
    * cartas fora da vez — aqui é a mesma coisa.
    */
   function ehMinhaVez() {
+    if (window.__ONLINE) return !!(__V && __V.suaVez && !__V.encerrada && !__V.rodadaEncerrada);
     if (partidaEncerrada || jogadorExpulso) return false;
     var jog = JOGADORES[turnoAtual];
     return !!jog && jog.tipo === "humano";
@@ -8492,7 +8493,7 @@ module.exports = { criarServidor };
     else if (v.suaVez && !v.jaComprou) hintEl.textContent = "sua vez! compre do monte pra começar";
     else if (v.suaVez && v.precisaUsarTopo) hintEl.textContent = "você pegou o lixo! baixe ou estenda a carta ♻ (o topo) antes de descartar";
     else if (v.suaVez) hintEl.textContent = "selecione 1 carta e toque no lixo pra descartar";
-    else hintEl.textContent = "vez de " + (JOGADORES[v.vez] ? JOGADORES[v.vez].nome : "outro jogador") + "…";
+    else hintEl.textContent = "vez de " + ((v.assentos && v.assentos[v.vez]) ? v.assentos[v.vez].apelido : "outro jogador") + "…";
     __afkSync(v); // cronômetro de 45s / substituição por AFK
   }
 
