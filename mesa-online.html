@@ -1078,7 +1078,7 @@
 
       <div class="topbar">
         <div class="brand"><span class="crown">♛</span><span class="name">BURACO MASTER VIP</span></div>
-        <span class="mesa-alvo" id="mesa-alvo" title="tocar troca a modalidade"><b id="ma-meta">meta 3000</b><i id="ma-rodada">SBTL · rodada 1</i></span>
+        <span class="mesa-alvo" id="mesa-alvo" title="tocar troca a modalidade"><b id="ma-meta">meta 3000</b><i id="ma-rodada">STBL · rodada 1</i></span>
         <div class="top-icons">
           <div class="ic" id="btn-reordenar" title="reordenar mão">⇄</div>
           <div class="ic">☰</div>
@@ -1407,7 +1407,7 @@ function podeEstenderSequencia(sequenciaAtual, novaCarta) {
 
 // ===== motor/bot.js (embutido) =====
 // motor/bot.js
-// Cérebro de decisão de um bot "intermediário" de Buraco (variante SBTL/Jogatina).
+// Cérebro de decisão de um bot "intermediário" de Buraco (variante STBL/Jogatina).
 // Reutiliza a validação de sequência/canastra já testada em motor/canastra.js —
 // o bot NUNCA reimplementa regra de jogo; ele só decide ENTRE jogadas válidas.
 //
@@ -1707,7 +1707,7 @@ function decidirCompra({ mao, topoLixo, jogosMesaDupla = [], tamanhoLixo = 1, mo
     };
   }
 
-  // ===== FECHADO / SBTL: compra JUSTIFICADA =====
+  // ===== FECHADO / STBL: compra JUSTIFICADA =====
   // TRAVA "CARTA NÃO TEM MOLA": só compra o lixo se houver PROVA concreta de
   // uso imediato do topo. A prova é o plano que será executado — impossível
   // comprar e não usar. Sem prova → monte.
@@ -1839,7 +1839,7 @@ function provarUsoDoTopo({ topo, mao, jogosMesaDupla, tamanhoLixo = 1 }) {
  *                       curingão SUJA EM DEFINITIVO — nunca há como limpar,
  *                       porque ele não tem naipe pra "voltar" ao lugar.
  *
- * SBTL = "Sem Trinca e Bate com Limpa" — é o Fechado com as duas regras mais
+ * STBL = "Sem Trinca e Batida Limpa" — é o Fechado com as duas regras mais
  * duras. Daí ser a modalidade dos jogadores experientes.
  */
 const MODALIDADES = {
@@ -1980,7 +1980,7 @@ function vizinhos(mao, carta) {
 }
 
 /**
- * Decide se o bot deve pegar o morto AGORA. No SBTL, basta a mão estar vazia
+ * Decide se o bot deve pegar o morto AGORA. No STBL, basta a mão estar vazia
  * (não exige canastra). Retorna true se a mão ficou vazia após as baixadas.
  */
 function decidirPegarMorto({ maoAposBaixar, mortoDisponivel }) {
@@ -2590,9 +2590,9 @@ function validarTrinca(cartas) {
  */
 function validarJogo(cartas, opts = {}) {
   // O GRUPO DE ASES ("canastra de ás") é da família TRINCA — mesmo VALOR, não é
-  // sequência de verdade. Só vale onde trinca vale (Fechado). No SBTL/Aberto, ás
+  // sequência de verdade. Só vale onde trinca vale (Fechado). No STBL/Aberto, ás
   // só entra em SEQUÊNCIA (A-2-3 ou Q-K-A). Bug pego pela Sônia (20/jul): o robô
-  // descia AAA no SBTL porque essa exceção furava a trava de trinca.
+  // descia AAA no STBL porque essa exceção furava a trava de trinca.
   const soAses = !!(cartas && cartas.length && cartas.every((c) => c && c.valor === "A" && !c.eh_coringa));
   const rSeq = validarSequencia(cartas);
   if (rSeq.valido && !(soAses && !opts.permiteTrinca)) return rSeq;
@@ -2601,7 +2601,7 @@ function validarJogo(cartas, opts = {}) {
     if (rTri.valido) return rTri;
     return { valido: false, motivo: "não forma uma sequência nem uma trinca válida" };
   }
-  if (soAses) return { valido: false, motivo: "no SBTL/Aberto o ás só entra em sequência (trinca de ases é só no Fechado)" };
+  if (soAses) return { valido: false, motivo: "no STBL/Aberto o ás só entra em sequência (trinca de ases é só no Fechado)" };
   return rSeq;
 }
 
@@ -2649,7 +2649,7 @@ module.exports = {
 
   __fabricas["bot"] = function (module, exports, require) {
 // motor/bot.js
-// Cérebro de decisão de um bot "intermediário" de Buraco (variante SBTL/Jogatina).
+// Cérebro de decisão de um bot "intermediário" de Buraco (variante STBL/Jogatina).
 // Reutiliza a validação de sequência/canastra já testada em motor/canastra.js —
 // o bot NUNCA reimplementa regra de jogo; ele só decide ENTRE jogadas válidas.
 //
@@ -2997,7 +2997,7 @@ function decidirCompra({ mao, topoLixo, jogosMesaDupla = [], tamanhoLixo = 1, mo
     };
   }
 
-  // ===== FECHADO / SBTL: compra JUSTIFICADA =====
+  // ===== FECHADO / STBL: compra JUSTIFICADA =====
   // TRAVA "CARTA NÃO TEM MOLA": só compra o lixo se houver PROVA concreta de
   // uso imediato do topo. A prova é o plano que será executado — impossível
   // comprar e não usar. Sem prova → monte.
@@ -3140,7 +3140,7 @@ function provarUsoDoTopo({ topo, mao, jogosMesaDupla, tamanhoLixo = 1, permiteTr
  *                       curingão SUJA EM DEFINITIVO — nunca há como limpar,
  *                       porque ele não tem naipe pra "voltar" ao lugar.
  *
- * SBTL = "Sem Trinca e Bate com Limpa" — é o Fechado com as duas regras mais
+ * STBL = "Sem Trinca e Batida Limpa" — é o Fechado com as duas regras mais
  * duras. Daí ser a modalidade dos jogadores experientes.
  */
 const MODALIDADES = {
@@ -3282,7 +3282,7 @@ function vizinhos(mao, carta) {
 }
 
 /**
- * Decide se o bot deve pegar o morto AGORA. No SBTL, basta a mão estar vazia
+ * Decide se o bot deve pegar o morto AGORA. No STBL, basta a mão estar vazia
  * (não exige canastra). Retorna true se a mão ficou vazia após as baixadas.
  */
 function decidirPegarMorto({ maoAposBaixar, mortoDisponivel }) {
@@ -4005,7 +4005,7 @@ function topoTemUsoLegal(jogo, assento, topo) {
   return false;
 }
 
-/** COMPRAR O LIXO INTEIRO. No SBTL/Fechado (compra justificada) o TOPO precisa
+/** COMPRAR O LIXO INTEIRO. No STBL/Fechado (compra justificada) o TOPO precisa
  *  ter uso imediato — "carta não tem mola" (legalidade via topoTemUsoLegal).
  *  Leva o lixo todo pra mão e liga a trava deveUsarTopo (só solta quando o topo
  *  for baixado/estendido; até lá não pode descartar). */
@@ -4411,7 +4411,7 @@ function jogarTurnoBot(jogo, assento) {
 
   let comprouLixo = false;
   // SEGURANÇA anti-trava (bug do lixo vazio, Sônia 18/jul): pegar o lixo OBRIGA a
-  // baixar o topo (deveUsarTopo) no SBTL/Fechado. Se, depois de baixar o topo, não
+  // baixar o topo (deveUsarTopo) no STBL/Fechado. Se, depois de baixar o topo, não
   // sobrar carta pra DESCARTAR, o bot fica com 1 carta impossível de largar e passa
   // a vez SEM descartar — o lixo chega vazio pro próximo. Então: só pega o lixo se
   // sobrar reserva pro descarte DEPOIS do custo mínimo de baixar o topo. Senão,
@@ -4421,7 +4421,7 @@ function jogarTurnoBot(jogo, assento) {
     (jogo.maos[assento].length + jogo.lixo.length) - custoMinimoTopo(jogo, assento, topo) < reservaMinima(jogo, assento);
   // VULNERABILIDADE (bug do bot adversário abrindo 15 pts vulnerável, Sônia 19/jul):
   // com a dupla vulnerável e a mesa AINDA vazia (abertura) numa modalidade que obriga
-  // usar o topo (SBTL/Fechado), pegar o lixo forçaria ABRIR um jogo com o topo — e a
+  // usar o topo (STBL/Fechado), pegar o lixo forçaria ABRIR um jogo com o topo — e a
   // abertura precisa somar 75/90. Um jogo do topo (3 cartas) quase nunca alcança isso,
   // e o forcarTopoNaMesa acabava ABRINDO fraco na marra. Então o bot NÃO pega o lixo
   // nesse caso: compra do monte e abre da mão quando puder (o cérebro respeita o
@@ -4461,7 +4461,7 @@ function jogarTurnoBot(jogo, assento) {
     modalidade: jogo.modalidade,
   });
 
-  // 2.5) DESCE O TOPO OBRIGATÓRIO PRIMEIRO. Se comprou o lixo (SBTL/Fechado), o
+  // 2.5) DESCE O TOPO OBRIGATÓRIO PRIMEIRO. Se comprou o lixo (STBL/Fechado), o
   //    topo TEM que ir pra mesa antes de qualquer outra jogada — senão uma extensão
   //    de uma carta DUPLICADA (mesmo valor/naipe, id diferente) pode roubar o exato
   //    encaixe do topo e deixá-lo órfão na mão, travando o descarte (bug raro do
@@ -5208,7 +5208,7 @@ module.exports = { criarServidor };
       provaTopo: estadoTela.provaTopo || null,
       modalidade: MODALIDADE,
       // No ABERTO o lixo é visível: o bot enxerga TODAS as cartas, a mesma
-      // informação que os humanos têm na mesa. No Fechado/SBTL fica null — ele
+      // informação que os humanos têm na mesa. No Fechado/STBL fica null — ele
       // só conhece o topo e o tamanho da pilha, como todo mundo.
       cartasLixo: (estadoTela.cartasLixo && estadoTela.cartasLixo.length)
         ? maoTelaParaMotor(estadoTela.cartasLixo) : null
@@ -5272,7 +5272,7 @@ module.exports = { criarServidor };
 
   // ========================================================================
   // ESTADO DA PARTIDA (persiste entre rodadas)
-  // No SBTL a batida encerra só a RODADA; a partida segue até uma dupla atingir
+  // No STBL a batida encerra só a RODADA; a partida segue até uma dupla atingir
   // a pontuação-alvo (2000/3000). Ao cruzar METADE do alvo, a dupla fica
   // vulnerável (precisa 75+ pontos na mão pra 1ª baixada; 90+ nas rodadas
   // seguintes de vulnerabilidade). Espelha motor/partida.js e motor/vulnerabilidade.js.
@@ -5704,7 +5704,7 @@ module.exports = { criarServidor };
   /** Uma canastra "limpa" pra fins de batida final = jogo de 7+ cartas SEM
    *  curinga. A canastra de 500 (Ás a Rei, 13 cartas, sem curinga) também é
    *  limpa por definição, então conta. Canastra suja (com curinga) NÃO conta —
-   *  regra do SBTL confirmada pela Sônia. Checa validando as cartas reais do
+   *  regra do STBL confirmada pela Sônia. Checa validando as cartas reais do
    *  jogo (mais confiável que ler o texto da etiqueta). */
   function meldEhLimpa(meldEl) {
     var cartas = extrairCartasDoStack(meldEl.querySelector(".stack"));
@@ -5736,7 +5736,7 @@ module.exports = { criarServidor };
     return false;
   }
 
-  /** Encerra a partida (SBTL: a batida final termina o jogo, não só a rodada).
+  /** Encerra a partida (STBL: a batida final termina o jogo, não só a rodada).
    *  Faz a contagem da RODADA, acumula no placar da partida e decide: nova
    *  rodada ou fim de partida (se alguém atingiu a pontuação-alvo). */
   /** Valor somado das cartas de uma mão (pra descontar no fim da rodada). */
@@ -6563,7 +6563,7 @@ module.exports = { criarServidor };
   }
 
   /** "Compra justificada" — regra confirmada válida nas 3 modalidades (aberto,
-   *  fechado e SBTL): só pode levar o monte de descarte inteiro se a carta do
+   *  fechado e STBL): só pode levar o monte de descarte inteiro se a carta do
    *  topo servir IMEDIATAMENTE pra estender um jogo já existente, ou formar um
    *  jogo novo junto com 2 cartas da mão. */
   function tentarComprarLixo() {
@@ -7228,7 +7228,7 @@ module.exports = { criarServidor };
       minimoAbertura: minimoAberturaDupla,
       tamanhoLixo: lixoCartas.length,
       // ABERTO: o lixo é visível, então o bot recebe todas as cartas (mesma
-      // informação dos humanos). Fechado/SBTL: só o topo e o tamanho.
+      // informação dos humanos). Fechado/STBL: só o topo e o tamanho.
       cartasLixo: regrasMesa().lixoVisivel ? lixoCartas : null
     });
     if (!plano) { logDebug(jog.nome, "motor não carregou — bot não jogou", ""); avancarAposBot(); return; }
@@ -7247,7 +7247,7 @@ module.exports = { criarServidor };
     var compradaTexto = "";
     if (plano.compra.origem === "lixo" && topoLixo) {
       // Quem compra do lixo leva o MONTE INTEIRO de descarte (todas as modalidades).
-      // A diferença: no Fechado/SBTL o topo TEM que ir pra mesa (compra
+      // A diferença: no Fechado/STBL o topo TEM que ir pra mesa (compra
       // justificada); no ABERTO não há obrigação nenhuma — tudo vai pra mão.
       var qtdLixo = lixoCartas.length;
       if (regrasMesa().compraJustificada) {
@@ -7664,7 +7664,7 @@ module.exports = { criarServidor };
         ' &nbsp;<b>monte:</b> ' + poolMonte.length +
         ' &nbsp;<b>mortos:</b> ' + mortosDisponiveis.length +
         ' &nbsp;<b>seu morto:</b> ' + (mortoPegoNos ? "pego" : "não") +
-        '<br><b>curingões no baralho:</b> ' + (regrasMesa().curingao ? "4 (SBTL)" : "0 (modalidade sem curingão)") +
+        '<br><b>curingões no baralho:</b> ' + (regrasMesa().curingao ? "4 (STBL)" : "0 (modalidade sem curingão)") +
         ' &nbsp;<b>no monte agora:</b> ' + poolMonte.filter(function (c) { return c.r === "JOKER"; }).length;
     }
     debugMaosEl.innerHTML = "";
@@ -7758,7 +7758,7 @@ module.exports = { criarServidor };
     btnDarCuringao.addEventListener("click", function () {
       if (window.__ONLINE) { notificarMesa("🃏 QA de pescar Curingão é só pro modo local"); return; }
       if (!regrasMesa().curingao) {
-        notificarMesa("\u26a0\ufe0f esta modalidade n\u00e3o usa Curing\u00e3o \u2014 troque pro SBTL");
+        notificarMesa("\u26a0\ufe0f esta modalidade n\u00e3o usa Curing\u00e3o \u2014 troque pro STBL");
         return;
       }
       var i = -1;
@@ -7773,7 +7773,7 @@ module.exports = { criarServidor };
   }
 
   // ===== SELETOR DE MODALIDADE (no app real vem do lobby, ao criar a mesa) =====
-  // Tocar no card do topo cicla SBTL → Aberto → Fechado e recomeça a partida,
+  // Tocar no card do topo cicla STBL → Aberto → Fechado e recomeça a partida,
   // porque a modalidade define as regras desde a distribuição.
   var mesaAlvoEl = document.getElementById("mesa-alvo");
   if (mesaAlvoEl) {
@@ -7783,12 +7783,12 @@ module.exports = { criarServidor };
       var ordem = ["sbtl", "aberto", "fechado"];
       var prox = ordem[(ordem.indexOf(MODALIDADE) + 1) % ordem.length];
       var rotulos = {
-        sbtl: "SBTL \u2014 lixo fechado, compra justificada, sem trinca, bate com limpa",
-        aberto: "ABERTO \u2014 lixo \u00e0 vista e compra livre, sem trinca, bate com limpa",
+        sbtl: "STBL \u2014 lixo fechado, compra justificada, sem trinca, batida limpa",
+        aberto: "ABERTO \u2014 lixo \u00e0 vista e compra livre, sem trinca, batida limpa",
         fechado: "FECHADO \u2014 lixo fechado, compra justificada, com trinca, bate com suja"
       };
       if (prox === "fechado") {
-        notificarMesa("\uD83D\uDEA7 Fechado (trinca) ainda em constru\u00e7\u00e3o \u2014 pulando pro SBTL");
+        notificarMesa("\uD83D\uDEA7 Fechado (trinca) ainda em constru\u00e7\u00e3o \u2014 pulando pro STBL");
         prox = "sbtl";
       }
       MODALIDADE = prox;
@@ -8414,7 +8414,7 @@ module.exports = { criarServidor };
     ov.id = "__modo-overlay";
     var estado = { meta: "3000", mod: "sbtl" }; // padrões (iguais ao lobby da mesa privada)
     // tela de LOBBY (reproduz o lobby-v1 da mesa privada, a pedido da Sônia): marca +
-    // meta (1500/3000) + modalidade (SBTL/Fechado/Aberto) em pills, e o botão Começar.
+    // meta (1500/3000) + modalidade (STBL/Fechado/Aberto) em pills, e o botão Começar.
     var lobby = '<div class="__lb-card" id="__modo-lobby">' +
       '<div class="__lb-brand"><div class="__lb-crown">👑</div>' +
         '<h1>BURACO MASTER VIP</h1>' +
@@ -8427,7 +8427,7 @@ module.exports = { criarServidor };
         '</div>' +
         '<label style="margin-top:14px">Modalidade</label>' +
         '<div class="__lb-chips" data-group="mod">' +
-          '<div class="__lb-chip sel" data-v="sbtl">SBTL</div>' +
+          '<div class="__lb-chip sel" data-v="sbtl">STBL</div>' +
           '<div class="__lb-chip" data-v="fechado">Fechado</div>' +
           '<div class="__lb-chip" data-v="aberto">Aberto</div>' +
         '</div>' +
