@@ -860,6 +860,29 @@
   .debug-log-linha { padding: 3px 0; border-top: 1px dashed rgba(255,255,255,0.06); line-height: 1.35; }
   .debug-log-linha .quem { font-weight: 700; color: #F3C969; }
   .debug-log-linha .motivo { opacity: 0.7; font-style: italic; }
+  /* ---------- CHAT DE MESA (frases rápidas, v1 sem texto livre) ---------- */
+  .chat-panel {
+    position: absolute; left: 8px; right: 8px; bottom: 96px; z-index: 45;
+    padding: 10px 12px 12px; border-radius: 12px;
+    background: rgba(10,14,10,0.96); border: 1px solid rgba(201,161,90,0.35);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    display: none; max-height: 62%; flex-direction: column;
+  }
+  .chat-panel.show { display: flex; }
+  .chat-abas { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px dashed rgba(255,255,255,0.08); }
+  .chat-aba {
+    flex: 0 0 auto; padding: 6px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    background: rgba(255,255,255,0.06); color: #C7C2B6; border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+  }
+  .chat-aba.ativa { background: rgba(239,159,39,0.18); border-color: rgba(239,159,39,0.55); color: #F3C969; }
+  .chat-frases { display: flex; flex-wrap: wrap; gap: 6px; overflow-y: auto; }
+  .chat-frase-btn {
+    padding: 7px 12px; border-radius: 16px; font-size: 12px;
+    background: rgba(255,255,255,0.05); color: #E7E3D8; border: 1px solid rgba(255,255,255,0.12);
+    cursor: pointer;
+  }
+  .chat-frase-btn:active { background: rgba(239,159,39,0.22); border-color: rgba(239,159,39,0.5); }
+  .chat-fechar { align-self: flex-end; margin-top: 8px; font-size: 11px; color: #8a8577; background: none; border: none; cursor: pointer; padding: 4px 8px; }
   /* ---------- MORTOS COMPARTILHADOS (2 cartas LADO A LADO, como monte/lixo) ---------- */
   .mortos-stack { display: flex; gap: 4px; align-items: center; cursor: pointer; }
   .mortos-stack .morto-card { position: static; margin: 0; }
@@ -1082,7 +1105,7 @@
         <div class="top-icons">
           <div class="ic" id="btn-reordenar" title="reordenar mão">⇄</div>
           <div class="ic">☰</div>
-          <div class="ic">💬</div>
+          <div class="ic" id="btn-chat" title="chat da mesa">💬</div>
         </div>
       </div>
 
@@ -1204,6 +1227,13 @@
         <div id="debug-log"></div>
         <button id="btn-testar-substituicao" style="display:none; font-size:11px; padding:6px 12px; margin-top:8px; background:rgba(224,107,107,0.15); border:1px solid rgba(224,107,107,0.4); color:#F3C969; border-radius:8px; cursor:pointer;">🧪 simular saída do jogador</button>
         <button id="btn-dar-curingao" style="display:none; font-size:11px; padding:6px 12px; margin-top:8px; margin-left:6px; background:rgba(123,45,142,0.18); border:1px solid rgba(168,85,199,0.5); color:#E9DCF2; border-radius:8px; cursor:pointer;">🃏 me dá um Curingão</button>
+      </div>
+
+      <!-- CHAT DE MESA: 5 categorias de frases prontas (v1, sem texto livre) -->
+      <div class="chat-panel" id="chat-panel">
+        <div class="chat-abas" id="chat-abas"></div>
+        <div class="chat-frases" id="chat-frases"></div>
+        <button class="chat-fechar" id="chat-fechar">fechar ✕</button>
       </div>
 
       <div class="hand-shelf">
@@ -5528,6 +5558,12 @@ module.exports = { criarServidor };
     renderHand();
   });
 
+  // ===== Preferências de Configurações (app.html) — mesmo domínio, mesma
+  // localStorage. Chaves 'bmv_pref_<key>'; default=true quando ainda não gravado. =====
+  function prefOn(key, def){
+    try{ var v=localStorage.getItem('bmv_pref_'+key); return v==null ? (def!==false) : (v==='1'); }
+    catch(e){ return def!==false; }
+  }
   // --- Áudio sintetizado via Web Audio API (sem arquivo externo) ---
   var audioCtx = null;
   function getAudioCtx() {
@@ -5535,6 +5571,7 @@ module.exports = { criarServidor };
     return audioCtx;
   }
   function playWhoosh() {
+    if (!prefOn('efeitos', true)) return;
     var ctx = getAudioCtx();
     var osc = ctx.createOscillator();
     var gain = ctx.createGain();
@@ -5549,6 +5586,9 @@ module.exports = { criarServidor };
   /** Alerta de "é a sua vez": duas notas curtas e claras, tipo sino de mesa.
    *  Discreto o bastante pra não cansar a cada rodada. */
   function playAlertaSuaVez() {
+    // vibração (mobile) — feature nova, controlada pelo toggle "Vibração" das Configurações
+    try { if (prefOn('vibracao', false) && navigator.vibrate) navigator.vibrate([40, 60, 40]); } catch (e) {}
+    if (!prefOn('efeitos', true)) return;
     try {
       var ctx = getAudioCtx();
       var t0 = ctx.currentTime;
@@ -7701,6 +7741,65 @@ module.exports = { criarServidor };
     if (!mostrando) atualizarRaioX();
   });
 
+  // ===== CHAT DE MESA: 5 categorias de frases prontas (v1, sem texto livre) —
+  // moderação "de graça" porque a lista é fechada e aprovada, nada digitado
+  // livremente ainda (isso fica pra uma v2). Aprovado com a Sônia em 22/07. =====
+  var FRASES_RAPIDAS_MESA = {
+    cumprimentos: { rotulo: "Cumprimentos", frases: ["Boa sorte!", "Bom jogo!", "Vamos começar!", "Olá, pessoal!", "Sejam bem-vindos!", "Essa mesa promete!"] },
+    elogios:      { rotulo: "Elogios",      frases: ["Ótima jogada!", "Mandou bem!", "Que canastra!", "Bela sequência!", "Que virada!", "Parabéns!"] },
+    reacoes:      { rotulo: "Reações",      frases: ["Que sorte!", "Foi por pouco!", "Essa doeu!", "Que jogo apertado!", "Cartas, colaborem!", "Estou de olho! 👀"] },
+    dupla:        { rotulo: "Dupla",        frases: ["Boa, parceiro!", "Confio na dupla!", "Vamos reagir!", "Dá para virar!", "Foi mal, parceiro!", "Sem problema!"] },
+    despedidas:   { rotulo: "Despedidas",   frases: ["Boa partida!", "Parabéns pela vitória!", "Foi um ótimo jogo!", "Quero revanche!", "Valeu, pessoal!", "Obrigado pela partida!"] },
+  };
+  var __chatCategoriaAtiva = "cumprimentos";
+  var chatPanelEl = document.getElementById("chat-panel");
+  var chatAbasEl = document.getElementById("chat-abas");
+  var chatFrasesEl = document.getElementById("chat-frases");
+  var btnChatEl = document.getElementById("btn-chat");
+  var chatFecharEl = document.getElementById("chat-fechar");
+
+  function __renderChatAbas() {
+    chatAbasEl.innerHTML = "";
+    Object.keys(FRASES_RAPIDAS_MESA).forEach(function (chave) {
+      var b = document.createElement("div");
+      b.className = "chat-aba" + (chave === __chatCategoriaAtiva ? " ativa" : "");
+      b.textContent = FRASES_RAPIDAS_MESA[chave].rotulo;
+      b.addEventListener("click", function () {
+        __chatCategoriaAtiva = chave;
+        __renderChatAbas();
+        __renderChatFrases();
+      });
+      chatAbasEl.appendChild(b);
+    });
+  }
+  function __renderChatFrases() {
+    chatFrasesEl.innerHTML = "";
+    FRASES_RAPIDAS_MESA[__chatCategoriaAtiva].frases.forEach(function (frase) {
+      var b = document.createElement("div");
+      b.className = "chat-frase-btn";
+      b.textContent = frase;
+      b.addEventListener("click", function () {
+        // modo local (contra bots) não tem outro humano do outro lado — só ecoa
+        // na própria tela. Modo online real manda pro servidor, que devolve a
+        // mesma frase pra todo mundo sentado na mesa (inclusive você mesmo).
+        if (__modoLobbyUI) __enviarMsg({ tipo: "chat", frase: frase });
+        else notificarMesa("💬 Você: " + frase);
+        chatPanelEl.classList.remove("show");
+      });
+      chatFrasesEl.appendChild(b);
+    });
+  }
+  if (btnChatEl) {
+    btnChatEl.addEventListener("click", function () {
+      var mostrando = chatPanelEl.classList.contains("show");
+      if (mostrando) { chatPanelEl.classList.remove("show"); return; }
+      __renderChatAbas();
+      __renderChatFrases();
+      chatPanelEl.classList.add("show");
+    });
+  }
+  if (chatFecharEl) chatFecharEl.addEventListener("click", function () { chatPanelEl.classList.remove("show"); });
+
   var btnTestarSub = document.getElementById("btn-testar-substituicao");  if (btnTestarSub) {
     btnTestarSub.addEventListener("click", function () {
       if (window.__ONLINE) { hintEl.textContent = "QA de substituição é só pro modo local"; return; }
@@ -8173,7 +8272,8 @@ module.exports = { criarServidor };
 
     // ---- modo LOCAL (contra bots, servidor embutido no navegador) ----
     if (!self.ServidorBuraco) { hintEl.textContent = "servidor não carregou"; return; }
-    __escolherModo(function (modalidade, meta) {
+    var __cfgDiretaLocal = __lerConfigDireta();
+    var __seguirLocal = function (modalidade, meta) {
       MODALIDADE = modalidade;
       PONTUACAO_ALVO = meta;
       try { atualizarPlacaresDOM(); } catch (e) {}
@@ -8182,7 +8282,9 @@ module.exports = { criarServidor };
       __sid = __srv.conectar(__aoReceber);
       __enviarMsg({ tipo: "criarMesa", apelido: "Você", metaPontos: meta, modalidade: modalidade });
       __enviarMsg({ tipo: "iniciarPartida" });
-    });
+    };
+    if (__cfgDiretaLocal) __seguirLocal(__cfgDiretaLocal.modalidade, __cfgDiretaLocal.metaPontos);
+    else __escolherModo(__seguirLocal);
   }
 
   // ===== TRANSPORTE WEBSOCKET + LOBBY (online real) =====
@@ -8264,6 +8366,13 @@ module.exports = { criarServidor };
     // FIM DA PARTIDA (dados reais): o servidor mandou os ganhos do cofre. Guarda
     // e injeta no overlay de fim (que o estado 'encerrada' já abriu logo antes).
     if (msg.tipo === "fim") { __fimResumo = msg.resumo; __mostrarRecompensaFim(); return; }
+    // CHAT DE MESA: o servidor devolve a frase pra todo mundo sentado (autor
+    // incluído) — é o que confirma o envio na tela de quem mandou.
+    if (msg.tipo === "chat") {
+      var euMesmo = __MEU != null && msg.assento === __MEU;
+      notificarMesa("💬 " + (euMesmo ? "Você" : msg.apelido) + ": " + msg.frase);
+      return;
+    }
   }
   function __fecharOverlayModo() {
     var ov = document.getElementById("__modo-overlay");
@@ -8289,6 +8398,20 @@ module.exports = { criarServidor };
     // bastava a partida acabar e entrar por código pra furar a punição.
     var penAte0 = __penalidadeAte();
     if (penAte0 > 0) { __telaPenalidadeInicio(penAte0); return; }
+    // Vem de um DESAFIO aceito no app (Amigos) — entra direto no código, sem
+    // mostrar a telinha de escolha (a mesa já foi criada por quem desafiou).
+    var __codigoDireto = null;
+    try {
+      var __qp = new URLSearchParams(location.search).get("entrarCodigo");
+      if (__qp && /^BURACO-\d{3,5}$/.test(__qp.toUpperCase())) __codigoDireto = __qp.toUpperCase();
+    } catch (e) {}
+    if (__codigoDireto) {
+      var __apDireto = "Você";
+      try { var __svd = localStorage.getItem("bmv_apelido"); if (__svd) __apDireto = __svd; } catch (e) {}
+      __apelidoJogador = __apDireto;
+      __enviarMsg({ tipo: "entrarMesa", codigo: __codigoDireto, apelido: __apDireto, jogadorId: __jogadorId() });
+      return;
+    }
     var ov = document.createElement("div"); ov.id = "__modo-overlay";
     ov.innerHTML =
       '<div class="__lb-card">' +
@@ -8319,6 +8442,11 @@ module.exports = { criarServidor };
       if (penC > 0) { ov.parentNode && ov.parentNode.removeChild(ov); __telaPenalidadeInicio(penC); return; }
       __apelidoJogador = apelido();
       ov.parentNode && ov.parentNode.removeChild(ov);
+      var __cfgDireta = __lerConfigDireta();
+      if (__cfgDireta) {
+        __enviarMsg({ tipo: "criarMesa", apelido: __apelidoJogador, jogadorId: __jogadorId(), modalidade: __cfgDireta.modalidade, metaPontos: __cfgDireta.metaPontos });
+        return;
+      }
       __escolherModo(function (modalidade, meta) {
         __enviarMsg({ tipo: "criarMesa", apelido: __apelidoJogador, jogadorId: __jogadorId(), modalidade: modalidade, metaPontos: meta });
         // a SALA DE ESPERA aparece quando o estado de lobby chegar
@@ -8407,6 +8535,21 @@ module.exports = { criarServidor };
    *  como na mesa privada / no print da Sônia: Aberto, Fechado (trincas) e STBL.
    *  Tem também o card REGRAS (tabela modos × regras). Chama `cb(modalidade)`
    *  quando a Sônia escolhe. Criado em JS pra não tocar no HTML da v111. */
+  // Config direta vinda da tela "Onde jogar" do app.html (modalidade + meta já
+  // escolhidos por lá) — se existir e for recente, pula o popup de escolha aqui
+  // dentro (evita perguntar 2x a mesma coisa). Expira em 5min pra não reaproveitar
+  // uma escolha velha de uma visita anterior.
+  function __lerConfigDireta() {
+    try {
+      var raw = localStorage.getItem("bmv_criar_mesa_direto");
+      if (!raw) return null;
+      localStorage.removeItem("bmv_criar_mesa_direto");
+      var cfg = JSON.parse(raw);
+      if (!cfg || !cfg.modalidade || !cfg.metaPontos) return null;
+      if (Date.now() - (cfg.ts || 0) > 5 * 60 * 1000) return null;
+      return cfg;
+    } catch (e) { return null; }
+  }
   function __escolherModo(cb) {
     // se penalizado, nem mostra a escolha de mesa — manda pro bloqueio do início
     if (__penalidadeAte() > 0) { __telaPenalidadeInicio(__penalidadeAte()); return; }
@@ -8652,7 +8795,7 @@ module.exports = { criarServidor };
     // certo é o próprio mortoPego.nos mudando de false pra true.
     var __pegouMortoAgora = !!(v.mortoPego && v.mortoPego.nos) && !__ultimoMortoPegoNos;
     hand = (v.suaMao || []).map(motorParaTela);
-    __ordenarMao(); // a mão já vem organizada, sempre
+    if (prefOn('ordenarCartas', true)) __ordenarMao(); // respeita o toggle de Configurações (default: liga)
     // pegou o lixo? marca a carta do TOPO (que precisa ser usada) com o selo ♻
     if (v.precisaUsarTopo) {
       for (var _hi = 0; _hi < hand.length; _hi++) {
