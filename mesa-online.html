@@ -891,6 +891,34 @@
   .toast-item.toast-emoji { display: flex; align-items: center; gap: 6px; }
   .toast-item.toast-emoji img { width: 26px; height: 26px; vertical-align: middle; }
   .chat-fechar { align-self: flex-end; margin-top: 8px; font-size: 11px; color: #8a8577; background: none; border: none; cursor: pointer; padding: 4px 8px; }
+  /* ---------- MODO TORCIDA (chat de espectadores, v1) ---------- */
+  .torcida-reacoes-rapidas { display: flex; gap: 8px; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px dashed rgba(255,255,255,0.08); }
+  .torcida-reacao-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 8px 4px; border-radius: 12px; font-size: 10px; font-weight: 700; color: #E7E3D8;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); cursor: pointer;
+  }
+  .torcida-reacao-btn span.emoji { font-size: 20px; }
+  .torcida-reacao-btn:active { background: rgba(239,159,39,0.22); border-color: rgba(239,159,39,0.5); }
+  .toast-item.toast-torcida { color: #F3C969; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .toast-ocultar { flex: 0 0 auto; background: none; border: none; color: #8a8577; font-size: 12px; cursor: pointer; padding: 2px 4px; opacity: 0.7; }
+  .toast-ocultar:active { opacity: 1; }
+  /* Espectador não joga: some com a mão, o botão de reordenar e o chat de MESA
+     (que é só de quem está sentado) — ele usa o botão/painel da Torcida. */
+  body.modo-espectador .hand-shelf,
+  body.modo-espectador #btn-reordenar,
+  body.modo-espectador #btn-chat,
+  body.modo-espectador #chat-panel { display: none !important; }
+  body.modo-espectador #btn-torcida { display: flex !important; }
+  /* "arquibancada viva" (pedido da Sônia): quando a reação agregada da
+     torcida chega, a mesa acende discretamente por um instante — sem
+     atrapalhar o jogo, só um brilho dourado na borda. */
+  @keyframes torcidaGlow {
+    0% { box-shadow: 0 0 0 0 rgba(243,201,105,0); }
+    30% { box-shadow: 0 0 26px 6px rgba(243,201,105,0.55); }
+    100% { box-shadow: 0 0 0 0 rgba(243,201,105,0); }
+  }
+  .felt.torcida-glow { animation: torcidaGlow 1.4s ease-out; }
   /* ---------- MORTOS COMPARTILHADOS (2 cartas LADO A LADO, como monte/lixo) ---------- */
   .mortos-stack { display: flex; gap: 4px; align-items: center; cursor: pointer; }
   .mortos-stack .morto-card { position: static; margin: 0; }
@@ -1114,11 +1142,12 @@
           <div class="ic" id="btn-reordenar" title="reordenar mão">⇄</div>
           <div class="ic">☰</div>
           <div class="ic" id="btn-chat" title="chat da mesa">💬</div>
+          <div class="ic" id="btn-torcida" title="chat da torcida" style="display:none">📣</div>
         </div>
       </div>
 
       <div class="felt-wrap">
-        <div class="felt">
+        <div class="felt" id="felt-mesa">
           <div class="felt-inner">
             <!-- marca d'água leve da logo, atrás das cartas -->
             <div class="marca-agua" aria-hidden="true">
@@ -1242,6 +1271,16 @@
         <div class="chat-abas" id="chat-abas"></div>
         <div class="chat-frases" id="chat-frases"></div>
         <button class="chat-fechar" id="chat-fechar">fechar ✕</button>
+      </div>
+
+      <!-- MODO TORCIDA: chat só de espectadores. As 4 reações do topo (👏❤️😮👑)
+           são as únicas que chegam (agregadas e anônimas) pros jogadores; o
+           resto das categorias fica só entre quem está assistindo. -->
+      <div class="chat-panel torcida-panel" id="torcida-panel">
+        <div class="torcida-reacoes-rapidas" id="torcida-reacoes"></div>
+        <div class="chat-abas" id="torcida-abas"></div>
+        <div class="chat-frases" id="torcida-frases"></div>
+        <button class="chat-fechar" id="torcida-fechar">fechar ✕</button>
       </div>
 
       <div class="hand-shelf">
@@ -7173,6 +7212,8 @@ module.exports = { criarServidor };
    *  ele precisa saber se é a vez de outro, se a partida acabou ou se o robô
    *  assumiu o lugar dele. "Nada acontece" é o pior diagnóstico possível. */
   function bloqueadoForaDaVez() {
+    // Modo Torcida: espectador nunca joga — não importa de quem seja a vez.
+    if (__modoEspectador) { hintEl.textContent = "você está assistindo — só quem está sentado joga"; return true; }
     if (ehMinhaVez()) return false;
     if (partidaEncerrada) {
       hintEl.textContent = "\uD83C\uDFC6 a partida j\u00e1 terminou";
@@ -7872,6 +7913,122 @@ module.exports = { criarServidor };
   }
   if (chatFecharEl) chatFecharEl.addEventListener("click", function () { chatPanelEl.classList.remove("show"); });
 
+  // ===== MODO TORCIDA: chat só de ESPECTADORES (v1, 22/07) — 7 categorias de
+  // frases + 4 reações rápidas (👏❤️😮👑). As frases das categorias ficam só
+  // entre quem está assistindo; as 4 reações são as ÚNICAS que o servidor
+  // repassa (agregadas e anônimas, com atraso) pros jogadores — ver
+  // torcidaReacao no __aoReceber. Espelha EXATAMENTE FRASES_TORCIDA e
+  // REACOES_NEUTRAS_TORCIDA do server.js (mesmas frases, mesma ordem).
+  var FRASES_TORCIDA = {
+    entrada:      { rotulo: "Entrada",      frases: ["Cheguei para assistir!", "Essa mesa promete!", "Boa sorte às duplas!", "Hoje tem jogão!", "Vamos ver quem domina a mesa!", "Preparem a pipoca!"] },
+    reacoes:      { rotulo: "Reações",      frases: ["Que jogada!", "Essa foi bonita!", "Jogada de mestre!", "Que sequência!", "Agora ficou emocionante!", "Foi por pouco!", "Essa doeu!", "Que virada!", "A mesa pegou fogo!", "Essa partida está demais!"] },
+    torcida:      { rotulo: "Torcida",      frases: ["Vamos, dupla!", "Estou torcendo por vocês!", "Ainda dá para virar!", "Segurem a pressão!", "Confiança na dupla!", "Que parceria!", "Vocês estão jogando muito!", "Não desistam!"] },
+    elogios:      { rotulo: "Elogios",      frases: ["Que leitura de jogo!", "Dupla entrosada!", "Isso é experiência!", "Que partida equilibrada!", "Jogaram com categoria!", "Essa merece aplausos!", "Digna do Hall dos Imortais!", "Essa foi de campeão!"] },
+    humor:        { rotulo: "Humor",        frases: ["Meu coração não aguenta!", "Cadê a pipoca?", "Estou só observando o caos. 😅", "Essa mesa virou final de campeonato!", "Tem emoção até no descarte!", "Essa partida merece replay!", "Ninguém quer entregar esse jogo!", "Eu vim assistir e já estou nervoso!"] },
+    fairplay:     { rotulo: "Fair Play",    frases: ["Respeito às duas duplas!", "Que vença a melhor dupla!", "Jogo bonito é assim!", "Excelente clima na mesa!", "Parabéns pela esportividade!", "Grande partida para todos!"] },
+    encerramento: { rotulo: "Encerramento", frases: ["Parabéns aos vencedores!", "Vocês deram um show!", "Que partida!", "Essa entrou para a história!", "Queremos revanche!", "Quero assistir à próxima!", "Parabéns às duas duplas!", "Até a próxima mesa!"] },
+  };
+  var REACOES_NEUTRAS_TORCIDA_UI = [
+    { id: "aplausos", emoji: "👏", rotulo: "Aplausos" },
+    { id: "coracao", emoji: "❤️", rotulo: "Coração" },
+    { id: "surpresa", emoji: "😮", rotulo: "Surpresa" },
+    { id: "coroa", emoji: "👑", rotulo: "Coroa" },
+  ];
+  var __torcidaCategoriaAtiva = "entrada";
+  var torcidaPanelEl = document.getElementById("torcida-panel");
+  var torcidaReacoesEl = document.getElementById("torcida-reacoes");
+  var torcidaAbasEl = document.getElementById("torcida-abas");
+  var torcidaFrasesEl = document.getElementById("torcida-frases");
+  var btnTorcidaEl = document.getElementById("btn-torcida");
+  var torcidaFecharEl = document.getElementById("torcida-fechar");
+
+  function __renderTorcidaReacoes() {
+    torcidaReacoesEl.innerHTML = "";
+    REACOES_NEUTRAS_TORCIDA_UI.forEach(function (r) {
+      var b = document.createElement("div");
+      b.className = "torcida-reacao-btn";
+      b.innerHTML = '<span class="emoji">' + r.emoji + '</span><span>' + r.rotulo + '</span>';
+      b.addEventListener("click", function () {
+        __enviarMsg({ tipo: "chatTorcida", reacao: r.id });
+        torcidaPanelEl.classList.remove("show");
+      });
+      torcidaReacoesEl.appendChild(b);
+    });
+  }
+  function __renderTorcidaAbas() {
+    torcidaAbasEl.innerHTML = "";
+    Object.keys(FRASES_TORCIDA).forEach(function (chave) {
+      var b = document.createElement("div");
+      b.className = "chat-aba" + (chave === __torcidaCategoriaAtiva ? " ativa" : "");
+      b.textContent = FRASES_TORCIDA[chave].rotulo;
+      b.addEventListener("click", function () {
+        __torcidaCategoriaAtiva = chave;
+        __renderTorcidaAbas();
+        __renderTorcidaFrases();
+      });
+      torcidaAbasEl.appendChild(b);
+    });
+  }
+  function __renderTorcidaFrases() {
+    torcidaFrasesEl.innerHTML = "";
+    FRASES_TORCIDA[__torcidaCategoriaAtiva].frases.forEach(function (frase) {
+      var b = document.createElement("div");
+      b.className = "chat-frase-btn";
+      b.textContent = frase;
+      b.addEventListener("click", function () {
+        __enviarMsg({ tipo: "chatTorcida", frase: frase });
+        torcidaPanelEl.classList.remove("show");
+      });
+      torcidaFrasesEl.appendChild(b);
+    });
+  }
+  if (btnTorcidaEl) {
+    btnTorcidaEl.addEventListener("click", function () {
+      var mostrando = torcidaPanelEl.classList.contains("show");
+      if (mostrando) { torcidaPanelEl.classList.remove("show"); return; }
+      __renderTorcidaReacoes();
+      __renderTorcidaAbas();
+      __renderTorcidaFrases();
+      torcidaPanelEl.classList.add("show");
+    });
+  }
+  if (torcidaFecharEl) torcidaFecharEl.addEventListener("click", function () { torcidaPanelEl.classList.remove("show"); });
+
+  // "ocultar espectador" (pedido da Sônia): silencia localmente, só na SUA
+  // tela — não é moderação de verdade (isso pediria um painel de denúncia
+  // que ainda não existe), mas já resolve o incômodo na hora, sem precisar
+  // de mais nada do servidor. Fica só na memória da aba (reseta ao recarregar
+  // — é um filtro pessoal, não uma punição permanente pro outro espectador).
+  var __torcidaOcultos = {};
+  /** Toast do chat da TORCIDA (só espectadores veem — jogadores nunca recebem
+   *  isso bruto, só a reação agregada em torcidaReacao). Tem um botão 🔇 pra
+   *  ocultar esse espectador específico dali pra frente. */
+  function notificarTorcida(quem, texto, jogadorId) {
+    if (jogadorId && __torcidaOcultos[jogadorId]) return; // já ocultado — nem mostra
+    var host = document.getElementById("toast-mesa");
+    if (!host) return;
+    var t = document.createElement("div");
+    t.className = "toast-item toast-torcida";
+    var span = document.createElement("span");
+    span.textContent = "📣 " + quem + ": " + texto;
+    t.appendChild(span);
+    if (jogadorId) {
+      var btnOcultar = document.createElement("button");
+      btnOcultar.className = "toast-ocultar";
+      btnOcultar.title = "ocultar " + quem;
+      btnOcultar.textContent = "🔇";
+      btnOcultar.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        __torcidaOcultos[jogadorId] = true;
+        t.remove();
+      });
+      t.appendChild(btnOcultar);
+    }
+    host.appendChild(t);
+    setTimeout(function () { t.classList.add("saindo"); }, 3600);
+    setTimeout(function () { t.remove(); }, 4200);
+  }
+
   var btnTestarSub = document.getElementById("btn-testar-substituicao");  if (btnTestarSub) {
     btnTestarSub.addEventListener("click", function () {
       if (window.__ONLINE) { hintEl.textContent = "QA de substituição é só pro modo local"; return; }
@@ -8380,6 +8537,12 @@ module.exports = { criarServidor };
   }
 
   var __codigoMesa = null, __modoLobbyUI = false, __apelidoJogador = "Você";
+  // Modo Torcida (22/07): espectador entra em modo LEITURA, sem cadeira. Usamos
+  // __MEU fixo em 0 pra reaproveitar toda a matemática de posições relativas
+  // (__parceiroSeat/__advSeats) sem precisar duplicar a mesa inteira — o
+  // espectador só não tem mão (suaMao nunca vem) e não pode agir (ver
+  // bloqueadoForaDaVez). O rótulo "você" vira o apelido real do assento 0.
+  var __modoEspectador = false;
   var __fimResumo = null; // resumo de ganhos da última partida (msg "fim")
 
   // injeta os ganhos ("🪙 +50 · ⭐ +160 XP · subiu de nível!") no overlay de fim
@@ -8418,6 +8581,15 @@ module.exports = { criarServidor };
       return;
     }
     if (msg.tipo === "entrou") { __MEU = msg.assento; __codigoMesa = msg.codigo; return; }
+    // Modo Torcida: espectador entrou em modo leitura. Fixamos __MEU=0 só pra
+    // reaproveitar a matemática de posições (ver comentário na declaração de
+    // __modoEspectador) — ele não é "dono" do assento 0, só um ponto de vista.
+    if (msg.tipo === "entrouAssistir") {
+      __modoEspectador = true; __MEU = 0; __codigoMesa = msg.codigo;
+      document.body.classList.add("modo-espectador");
+      __fecharOverlayModo();
+      return;
+    }
     if (msg.tipo === "erro") {
       var e2 = document.getElementById("__lb-erro");
       if (e2 && __modoLobbyUI) e2.textContent = msg.motivo;
@@ -8445,6 +8617,28 @@ module.exports = { criarServidor };
       var quemChat = euMesmo ? "Você" : msg.apelido;
       if (msg.emoji) { notificarMesaEmoji(quemChat, EMOJIS_SALAS_PUBLICAS[msg.emoji] || ""); return; }
       notificarMesa("💬 " + quemChat + ": " + msg.frase);
+      return;
+    }
+    // MODO TORCIDA: chat só entre espectadores (frase OU reação) — o servidor
+    // só manda isso pra quem está assistindo; jogadores nunca recebem este tipo.
+    if (msg.tipo === "chatTorcida") {
+      var __rTr = REACOES_NEUTRAS_TORCIDA_UI.find(function (r) { return r.id === msg.reacao; });
+      notificarTorcida(msg.apelido, msg.reacao ? (__rTr ? __rTr.emoji : msg.reacao) : msg.frase, msg.jogadorId);
+      return;
+    }
+    // MODO TORCIDA: reação AGREGADA que chega pros JOGADORES (anônima, com
+    // atraso natural da janela de agregação no servidor) — "6 pessoas
+    // aplaudiram!" em vez de identificar quem mandou.
+    if (msg.tipo === "torcidaReacao") {
+      var __txtReacao = msg.contagem === 1 ? "1 pessoa da torcida reagiu!" : (msg.contagem + " pessoas da torcida reagiram!");
+      notificarMesa(msg.emoji + " " + __txtReacao);
+      // "arquibancada viva": a mesa acende por um instante (ver CSS torcidaGlow)
+      var __feltMesa = document.getElementById("felt-mesa");
+      if (__feltMesa) {
+        __feltMesa.classList.remove("torcida-glow");
+        void __feltMesa.offsetWidth; // força reflow pra poder re-tocar a animação em sequência
+        __feltMesa.classList.add("torcida-glow");
+      }
       return;
     }
   }
@@ -8501,6 +8695,11 @@ module.exports = { criarServidor };
           '<input id="__cod-input" class="__lb-input __cod" maxlength="14" placeholder="BURACO-0000">' +
           '<button class="__lb-btn2" data-entrar-mesa="1">Entrar</button>' +
         '</div>' +
+        '<div class="__ou">— ou assista de camarote —</div>' +
+        '<div class="__entrar-row">' +
+          '<input id="__cod-assistir-input" class="__lb-input __cod" maxlength="14" placeholder="BURACO-0000">' +
+          '<button class="__lb-btn2 __lb-btn2-torcida" data-assistir-mesa="1">👀 Assistir</button>' +
+        '</div>' +
         '<div id="__lb-erro" class="__lb-err"></div>' +
       '</div>';
     document.body.appendChild(ov);
@@ -8533,6 +8732,16 @@ module.exports = { criarServidor };
       var cod = ((document.getElementById("__cod-input").value) || "").trim().toUpperCase();
       if (!/^BURACO-\d{3,5}$/.test(cod)) { document.getElementById("__lb-erro").textContent = "código no formato BURACO-0000"; return; }
       __enviarMsg({ tipo: "entrarMesa", codigo: cod, apelido: __apelidoJogador, jogadorId: __jogadorId() });
+    };
+    ov.querySelector("[data-assistir-mesa]").onclick = function () {
+      // Modo Torcida: assistir não tem penalidade nenhuma (não é uma partida
+      // sua) — não checa __penalidadeAte aqui.
+      __apelidoJogador = apelido();
+      var codA = ((document.getElementById("__cod-assistir-input").value) || "").trim().toUpperCase();
+      if (!/^BURACO-\d{3,5}$/.test(codA)) { document.getElementById("__lb-erro").textContent = "código no formato BURACO-0000"; return; }
+      __modoEspectador = true;
+      document.body.classList.add("modo-espectador");
+      __enviarMsg({ tipo: "assistirMesa", codigo: codA, apelido: __apelidoJogador, jogadorId: __jogadorId() });
     };
   }
 
@@ -8926,6 +9135,13 @@ module.exports = { criarServidor };
     __setJog("count-parceiro", v.assentos[__parc].apelido, v.assentos[__parc].qtdCartas);
     __setJog("count-adv2", v.assentos[__adv[1]].apelido, v.assentos[__adv[1]].qtdCartas);
     voceCountEl.textContent = "🂠 " + v.assentos[__MEU].qtdCartas;
+    // Modo Torcida: o espectador não é "você" — troca o rótulo fixo pelo apelido
+    // real de quem está sentado nesse assento (feito só 1x por sincronização,
+    // custo desprezível).
+    if (__modoEspectador) {
+      var __nmVoce = voceCountEl.parentElement && voceCountEl.parentElement.querySelector(".nm");
+      if (__nmVoce && v.assentos[__MEU]) __nmVoce.textContent = v.assentos[__MEU].apelido;
+    }
     // AVATAR na mesa: foto/galeria de cada jogador (pedido Sônia — ver a carinha)
     __setAvatarAssento(__MEU, v.assentos[__MEU]);
     __setAvatarAssento(__parc, v.assentos[__parc]);
