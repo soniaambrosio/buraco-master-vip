@@ -4855,13 +4855,16 @@ function criarGerenciador(opts = {}) {
   // controla o ritmo (jogarUmBot), pra dar o "respiro" entre jogadas na tela.
   const autoBots = opts.autoBots !== false;
 
-  function criarMesa({ apelido = "Jogador", jogadorId = null, modalidade = "sbtl", metaPontos = 3000, aposta = 0 } = {}) {
+  function criarMesa({ apelido = "Jogador", jogadorId = null, modalidade = "sbtl", metaPontos = 3000, aposta = 0, privada = false } = {}) {
     let codigo, tentativas = 0;
     do { codigo = gerarCodigo(); } while (salas[codigo] && ++tentativas < 100);
     if (salas[codigo]) return { erro: "não foi possível gerar um código único" };
     salas[codigo] = {
       codigo, modalidade, metaPontos,
       aposta: Math.max(0, Math.round(aposta || 0)), // entrada por jogador (0 = sem aposta)
+      // PRIVADA (recurso VIP): mesa por convite (código). Fica FORA do matchmaking
+      // público — só entra quem tem o código. Público nunca cai numa privada.
+      privada: !!privada,
       criadorAssento: 0,
       assentos: [{ apelido, tipo: "humano", jogadorId }, null, null, null],
       iniciada: false,
@@ -4871,6 +4874,23 @@ function criarGerenciador(opts = {}) {
       log: [],
     };
     return { codigo, assento: 0 };
+  }
+
+  /** MATCHMAKING PÚBLICO (pedido Sônia — bug: público entrava na privada). Junta o
+   *  jogador numa mesa PÚBLICA aberta (não privada, não iniciada, com assento livre);
+   *  se não houver, cria uma nova pública. NUNCA entra numa mesa privada. */
+  function entrarPublica({ apelido = "Jogador", jogadorId = null, modalidade = "sbtl", metaPontos = 3000 } = {}) {
+    for (const codigo in salas) {
+      const s = salas[codigo];
+      if (!s || s.privada || s.iniciada) continue;      // pula privada e mesa já começada
+      if (!s.assentos.some((a) => a === null)) continue; // sem assento livre
+      const r = entrarMesa({ codigo, apelido, jogadorId });
+      if (!r.erro) return { codigo, assento: r.assento, criador: false };
+    }
+    // nenhuma mesa pública aberta → cria uma nova (o jogador vira o anfitrião)
+    const r = criarMesa({ apelido, jogadorId, modalidade, metaPontos, privada: false });
+    if (r.erro) return r;
+    return { codigo: r.codigo, assento: r.assento, criador: true };
   }
 
   function entrarMesa({ codigo, apelido = "Jogador", jogadorId = null, assento } = {}) {
@@ -5124,7 +5144,7 @@ function criarGerenciador(opts = {}) {
     return { ok: true, codigo };
   }
 
-  return { salas, criarMesa, entrarMesa, iniciarPartida, aplicarJogada, avancarBots, vezEhBot, jogarUmBot, visao, sair, podeRevanche, perfilAssentos, reiniciarMesa };
+  return { salas, criarMesa, entrarMesa, entrarPublica, iniciarPartida, aplicarJogada, avancarBots, vezEhBot, jogarUmBot, visao, sair, podeRevanche, perfilAssentos, reiniciarMesa };
 }
 
 module.exports = { criarGerenciador, gerarCodigoPadrao, NOMES_BOT };
@@ -5224,7 +5244,7 @@ function criarServidor(opts = {}) {
           if (saldo < custoPriv) return enviarPara(id, { tipo: "saldoInsuficiente", motivo: "Você tem 🪙 " + saldo + " — abrir uma mesa privada custa 🪙 " + custoPriv + ".", saldo: saldo, custo: custoPriv });
           contas.ajustarMoedas(c.jogadorId, -custoPriv);
         }
-        const r = ger.criarMesa({ apelido: msg.apelido, jogadorId: c.jogadorId, modalidade: msg.modalidade, metaPontos: msg.metaPontos, aposta: msg.aposta });
+        const r = ger.criarMesa({ apelido: msg.apelido, jogadorId: c.jogadorId, modalidade: msg.modalidade, metaPontos: msg.metaPontos, aposta: msg.aposta, privada: !!msg.privada });
         if (r.erro) {
           if (custoPriv > 0 && contas && c.jogadorId) contas.ajustarMoedas(c.jogadorId, custoPriv); // devolve a taxa
           return enviarPara(id, { tipo: "erro", motivo: r.erro });
@@ -5241,6 +5261,17 @@ function criarServidor(opts = {}) {
         c.codigo = r.codigo || msg.codigo; c.assento = r.assento;
         enviarPara(id, { tipo: "entrou", codigo: c.codigo, assento: r.assento });
         return broadcastSala(c.codigo);
+      }
+      case "entrarPublica": {
+        // MATCHMAKING público: junta numa mesa pública aberta ou cria uma. NUNCA cai
+        // numa mesa privada (corrige o bug do público entrando na privada).
+        c.jogadorId = msg.jogadorId || c.jogadorId || null;
+        if (contas && c.jogadorId) contas.obterOuCriar(c.jogadorId, msg.apelido);
+        const r = ger.entrarPublica({ apelido: msg.apelido, jogadorId: c.jogadorId, modalidade: msg.modalidade, metaPontos: msg.metaPontos });
+        if (r.erro) return enviarPara(id, { tipo: "erro", motivo: r.erro });
+        c.codigo = r.codigo; c.assento = r.assento;
+        enviarPara(id, { tipo: "entrou", codigo: r.codigo, assento: r.assento, publica: true });
+        return broadcastSala(r.codigo);
       }
       case "perfil": {
         // dados REAIS da conta do jogador (pro Perfil/carteira do app)
@@ -8724,13 +8755,18 @@ module.exports = { criarServidor };
     // modalidade amigável pra treinar. (Pedido da Sônia nos testes.)
     var __treino = false; try { __treino = new URLSearchParams(location.search).get("treino") === "1"; } catch (e) {}
     var __privada = false; try { __privada = new URLSearchParams(location.search).get("privada") === "1"; } catch (e) {}
+    // PÚBLICA (?publica=1): matchmaking automático — junta com estranhos numa mesa
+    // pública (nunca numa privada). ENTRAR POR CÓDIGO (?entrarCodigo=BURACO-XXXX):
+    // convite de amigo pra mesa privada. (Correção do bug: público entrava na privada.)
+    var __publica = false; try { __publica = new URLSearchParams(location.search).get("publica") === "1"; } catch (e) {}
+    var __codConvite = null; try { __codConvite = new URLSearchParams(location.search).get("entrarCodigo") || null; } catch (e) {}
 
     // ===== ONLINE DE VERDADE: se houver um servidor configurado (?srv=wss://... ou
     // window.__DEFAULT_WS_URL), conecta por WebSocket e mostra o LOBBY (criar mesa /
     // entrar por código / sala de espera). Sem servidor, cai no modo LOCAL abaixo
     // (mesa contra bots, servidor no próprio navegador) — inalterado. =====
     var wsURL = __treino ? null : __resolverWS();
-    if (wsURL) { __iniciarOnlineReal(wsURL, { privada: __privada }); return; }
+    if (wsURL) { __iniciarOnlineReal(wsURL, { privada: __privada, publica: __publica, codConvite: __codConvite }); return; }
 
     // ---- modo LOCAL (contra bots, servidor embutido no navegador) ----
     if (!self.ServidorBuraco) { hintEl.textContent = "servidor não carregou"; return; }
@@ -8866,7 +8902,43 @@ module.exports = { criarServidor };
     __srv = criarTransporteWS(url);
     __sid = __srv.conectar(__aoReceber);
     if (opts && opts.privada) { __criarMesaPrivadaDireto(); return; }
+    if (opts && opts.publica) { __entrarPublicaDireto(); return; }         // matchmaking (nunca privada)
+    if (opts && opts.codConvite) { __entrarComCodigoDireto(opts.codConvite); return; } // convite de amigo
     __entradaOnline();
+  }
+
+  // MESA PÚBLICA (?publica=1): MATCHMAKING automático — o servidor junta o jogador
+  // numa mesa pública aberta (ou cria uma). NUNCA cai numa mesa privada. Sem digitar
+  // código. (Correção do bug da Sônia: público entrava na privada.)
+  function __entrarPublicaDireto() {
+    if (__penalidadeAte() > 0) { __telaPenalidadeInicio(__penalidadeAte()); return; }
+    var cfg = {}; try { cfg = JSON.parse(localStorage.getItem("bmv_criar_mesa_direto") || "{}"); } catch (e) {}
+    try { __apelidoJogador = localStorage.getItem("bmv_apelido") || "Você"; } catch (e) { __apelidoJogador = "Você"; }
+    __telaProcurando();
+    __enviarMsg({ tipo: "entrarPublica", apelido: __apelidoJogador, jogadorId: __jogadorId(),
+      modalidade: cfg.modalidade || "sbtl", metaPontos: cfg.metaPontos || 3000 });
+  }
+  // CONVITE DE AMIGO (?entrarCodigo=BURACO-XXXX): entra direto na mesa (privada) pelo código.
+  function __entrarComCodigoDireto(cod) {
+    cod = (cod || "").trim().toUpperCase();
+    try { __apelidoJogador = localStorage.getItem("bmv_apelido") || "Você"; } catch (e) { __apelidoJogador = "Você"; }
+    if (!/^BURACO-\d{3,5}$/.test(cod)) { __entradaOnline(); return; } // código inválido → lobby manual
+    __telaProcurando("entrando na mesa do seu amigo…");
+    __enviarMsg({ tipo: "entrarMesa", codigo: cod, apelido: __apelidoJogador, jogadorId: __jogadorId() });
+  }
+  // telinha simples "procurando…" (sai sozinha quando o estado de lobby/jogo chega)
+  function __telaProcurando(txt) {
+    var antigo = document.getElementById("__modo-overlay");
+    if (antigo && antigo.parentNode) antigo.parentNode.removeChild(antigo);
+    var ov = document.createElement("div"); ov.id = "__modo-overlay";
+    ov.innerHTML = '<div class="__lb-card" style="text-align:center">' +
+      '<div class="__lb-brand"><div class="__lb-crown">👥</div><h1>BURACO MASTER VIP</h1>' +
+      '<div class="__lb-tag">' + (txt || "procurando jogadores online…") + '</div></div>' +
+      '<div class="__pen-cron" style="font-size:34px">🔎</div>' +
+      '<button class="__modo-link" data-voltar-menu="1">‹ cancelar</button></div>';
+    document.body.appendChild(ov);
+    var vb = ov.querySelector("[data-voltar-menu]");
+    if (vb) vb.onclick = function () { try { if (__srv && __srv.fechar) __srv.fechar(); } catch (e) {} location.href = "app.html"; };
   }
 
   // MESA PRIVADA vinda do app (?privada=1): cria a sala direto com a config escolhida
