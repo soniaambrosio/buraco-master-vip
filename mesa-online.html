@@ -1081,6 +1081,31 @@
 #fim-recompensa .fr-moeda { background: rgba(246,226,166,.12); color: #f3d98a; }
 #fim-recompensa .fr-xp { background: rgba(127,212,255,.1); color: #bfe6ff; border-color: rgba(140,205,255,.3) !important; }
 #fim-recompensa .fr-nivel { margin-top: 8px; text-align: center; font-weight: 800; font-size: 14px; color: #2a1c02; background: linear-gradient(180deg,#f6e2a6,#cf9f3d); border-radius: 11px; padding: 8px; box-shadow: 0 4px 14px rgba(201,150,50,.35); }
+/* REVANCHE ("Vamos outra?") — tela de fim de mesa 100% humana (pedido Sônia 23/jul) */
+#__revanche-overlay { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 0%, #2a2118 0%, #14100b 60%, #0a0806 100%); padding: 14px; overflow: auto; }
+.__rv-card { width: min(94vw, 420px); background: linear-gradient(160deg,#1c1710,#120d07); border-radius: 24px; padding: 20px 18px 22px; box-shadow: 0 20px 60px rgba(0,0,0,.6), inset 0 0 0 1px rgba(232,200,106,.25); text-align: center; }
+.__rv-tit { font-size: 23px; font-weight: 800; letter-spacing: .4px; background: linear-gradient(180deg,#f6e2a6,#d5a84a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.__rv-sub { font-size: 12px; color: #b8a988; margin-top: 4px; }
+.__rv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0 14px; }
+.__rv-p { position: relative; background: rgba(255,255,255,.03); border: 1px solid rgba(232,200,106,.16); border-radius: 16px; padding: 15px 8px 11px; transition: .2s; }
+.__rv-p.__rv-topou { border-color: rgba(95,208,138,.65); background: rgba(95,208,138,.08); box-shadow: 0 0 16px rgba(95,208,138,.25); }
+.__rv-av { width: 60px; height: 60px; margin: 0 auto 8px; border-radius: 50%; overflow: hidden; background: linear-gradient(135deg,#5a2410,#3a1608); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px rgba(232,200,106,.45); }
+.__rv-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.__rv-ini { font-size: 26px; font-weight: 800; color: #F5C4B3; }
+.__rv-nome { font-size: 12.5px; color: #f0e4c2; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.__rv-nome b { color: #f0d283; font-weight: 800; font-size: 11px; }
+.__rv-time { display: inline-block; margin-top: 5px; font-size: 8px; font-weight: 900; padding: 2px 7px; border-radius: 6px; letter-spacing: .5px; }
+.__rv-balao { position: absolute; top: -13px; left: 50%; transform: translateX(-50%) scale(.55); opacity: 0; background: linear-gradient(180deg,#ffffff,#ffe9c2); color: #2a1c02; font-size: 11px; font-weight: 800; padding: 4px 11px; border-radius: 13px; white-space: nowrap; box-shadow: 0 5px 14px rgba(0,0,0,.45); transition: transform .25s cubic-bezier(.34,1.56,.64,1), opacity .2s; z-index: 4; pointer-events: none; }
+.__rv-balao::after { content: ""; position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); border: 6px solid transparent; border-top-color: #ffe9c2; border-bottom: 0; }
+.__rv-balao.show { opacity: 1; transform: translateX(-50%) scale(1); }
+.__rv-cron-wrap { font-size: 13.5px; color: #f0d283; font-weight: 700; margin: 2px 0 12px; font-variant-numeric: tabular-nums; }
+#__rv-cron { font-size: 19px; letter-spacing: 1px; }
+.__rv-ad { min-height: 92px; border: 1px dashed rgba(232,200,106,.35); border-radius: 14px; display: flex; align-items: center; justify-content: center; color: #8a7d63; font-size: 11.5px; margin-bottom: 15px; background: rgba(255,255,255,.02); }
+.__rv-acoes { display: flex; gap: 10px; }
+.__rv-acoes .__lb-btn { margin-top: 0; flex: 2; }
+.__rv-acoes .__lb-btn:disabled { filter: grayscale(.3) brightness(.95); cursor: default; }
+.__rv-sair { flex: 1; padding: 14px; border: 1px solid rgba(229,138,138,.5); border-radius: 14px; background: rgba(229,138,138,.08); color: #f0c9c9; font-weight: 800; font-size: 14px; cursor: pointer; transition: transform .06s; }
+.__rv-sair:active { transform: scale(.98); }
 </style>
 
 <meta name="theme-color" content="#0a0705">
@@ -5049,7 +5074,57 @@ function criarGerenciador(opts = {}) {
     return { ok: true };
   }
 
-  return { salas, criarMesa, entrarMesa, iniciarPartida, aplicarJogada, avancarBots, vezEhBot, jogarUmBot, visao, sair };
+  // ===== REVANCHE ("Vamos outra?") — pedido Sônia 23/jul =====
+  // No fim da partida, se a mesa for 100% HUMANA (nenhum robô, nenhum AFK), dá pra
+  // recomeçar na MESMA mesa com a MESMA galera. Se tiver 1 robô, não vale (regra
+  // dela: "se tiver 1 robô já não dá").
+  function podeRevanche(codigo) {
+    const sala = salas[codigo];
+    if (!sala || !sala.jogo || !sala.jogo.encerrada) return false;
+    for (let i = 0; i < 4; i++) {
+      const a = sala.jogo.assentos[i], sj = sala.assentos[i];
+      if (!a || a.tipo !== "humano" || !sj || !sj.jogadorId) return false;
+    }
+    return true;
+  }
+
+  /** Perfil de cada assento pra tela "Vamos outra?" (avatar + apelido + dupla).
+   *  Reaproveita o cofre pra puxar avatar/moldura de quem está sentado. */
+  function perfilAssentos(codigo) {
+    const sala = salas[codigo];
+    if (!sala || !sala.jogo) return null;
+    return sala.jogo.assentos.map((a, i) => {
+      const sj = sala.assentos[i];
+      const p = { assento: i, apelido: (a && a.apelido) || "", tipo: (a && a.tipo) || "bot", dupla: (i % 2 === 0) ? "nos" : "eles" };
+      if (contas && sj && sj.jogadorId) {
+        const c = contas.obter(sj.jogadorId);
+        if (c) {
+          p.jogadorId = sj.jogadorId;
+          p.avatarTipo = c.avatarTipo || null;
+          p.avatarId = c.avatarId || null;
+          p.avatarVer = c.avatarVer || 0;
+          p.molduraId = c.molduraId || null;
+        }
+      }
+      return p;
+    });
+  }
+
+  /** REVANCHE aceita por todos: redistribui uma partida NOVA na mesma mesa, com a
+   *  mesma galera e a mesma config (modalidade/meta). Zera o placar (jogo novo). */
+  function reiniciarMesa(codigo) {
+    const sala = salas[codigo];
+    if (!sala) return { erro: "mesa não encontrada" };
+    const assentosJogo = sala.assentos.map((a) => ({ tipo: a.tipo, apelido: a.apelido }));
+    sala.jogo = J.criarJogo({ assentos: assentosJogo, modalidade: sala.modalidade, metaPontos: sala.metaPontos });
+    sala.liquidada = false;
+    sala.resumoFinal = null;
+    if (autoBots) avancarBots(sala);
+    liquidar(sala);
+    return { ok: true, codigo };
+  }
+
+  return { salas, criarMesa, entrarMesa, iniciarPartida, aplicarJogada, avancarBots, vezEhBot, jogarUmBot, visao, sair, podeRevanche, perfilAssentos, reiniciarMesa };
 }
 
 module.exports = { criarGerenciador, gerarCodigoPadrao, NOMES_BOT };
@@ -5081,6 +5156,11 @@ function criarServidor(opts = {}) {
   const ger = criarGerenciador(Object.assign({}, opts, { autoBots: false }));
   const contas = opts.contas || null; // cofre de contas (opcional)
   const agendar = opts.agendar || ((fn) => fn());
+  // REVANCHE ("Vamos outra?"): janela de 3 min pra todo mundo topar (dá tempo do
+  // anúncio rodar — pedido Sônia). Injetável pra teste (revancheMs curto + timers fake).
+  const revancheMs = opts.revancheMs || 180000;
+  const agendarTempo = opts.agendarTempo || ((fn, ms) => setTimeout(fn, ms));
+  const cancelarTempo = opts.cancelarTempo || ((h) => clearTimeout(h));
   const conexoes = {}; // id -> { id, enviar, codigo, assento, jogadorId }
   let seq = 0;
 
@@ -5095,9 +5175,14 @@ function criarServidor(opts = {}) {
     if (!c) return;
     if (c.codigo != null && c.assento != null) {
       const cod = c.codigo;
+      const sala = ger.salas[cod];
+      const apel = (sala && sala.jogo && sala.jogo.assentos[c.assento]) ? sala.jogo.assentos[c.assento].apelido : "Um jogador";
+      const tinhaRevanche = !!(sala && sala.revanche && sala.revanche.ativa);
       ger.sair({ codigo: cod, assento: c.assento });
       c.codigo = null; c.assento = null;
-      broadcastSala(cod);
+      // caiu durante a revanche = a mesa não continua (os outros "vão atrás")
+      if (tinhaRevanche) cancelarRevanche(cod, "saiu", apel);
+      else broadcastSala(cod);
     }
     delete conexoes[id];
   }
@@ -5105,6 +5190,19 @@ function criarServidor(opts = {}) {
   function enviarPara(id, msg) {
     const c = conexoes[id];
     if (c && typeof c.enviar === "function") c.enviar(msg);
+  }
+
+  // manda uma msg pra TODAS as conexões de um jogador (por jogadorId) — usado pra
+  // avisar amigos online (pedido chegou / amizade aceita etc.)
+  function enviarParaJogador(jid, msg) {
+    if (!jid) return;
+    for (const k in conexoes) { if (conexoes[k].jogadorId === jid) enviarPara(k, msg); }
+  }
+  // conjunto de jogadorIds online agora (pra marcar amigos online)
+  function jogadoresOnline() {
+    const s = new Set();
+    for (const k in conexoes) { if (conexoes[k].jogadorId) s.add(conexoes[k].jogadorId); }
+    return s;
   }
 
   function processar(id, msg) {
@@ -5147,6 +5245,7 @@ function criarServidor(opts = {}) {
       case "perfil": {
         // dados REAIS da conta do jogador (pro Perfil/carteira do app)
         const jid = msg.jogadorId || c.jogadorId;
+        if (jid) c.jogadorId = jid; // associa a conexão ao jogador (pra ficar "online" p/ amigos)
         if (!contas || !jid) return enviarPara(id, { tipo: "perfil", conta: null });
         const conta = contas.obterOuCriar(jid, msg.apelido);
         return enviarPara(id, { tipo: "perfil", conta: Object.assign({ posicao: contas.posicaoNoRanking(jid) }, conta) });
@@ -5217,6 +5316,44 @@ function criarServidor(opts = {}) {
         if (r && r.erro) return enviarPara(id, { tipo: "erro", motivo: r.erro });
         return enviarPara(id, { tipo: "tratamento", conta: r });
       }
+      // ===== AMIGOS =====
+      case "buscarJogador": {
+        c.jogadorId = msg.jogadorId || c.jogadorId || null;
+        if (!contas || !c.jogadorId) return enviarPara(id, { tipo: "resultadoBusca", lista: [] });
+        contas.obterOuCriar(c.jogadorId, msg.apelido);
+        const lista = contas.buscarPorApelido(msg.termo, c.jogadorId, 20);
+        const on = jogadoresOnline();
+        lista.forEach((a) => { a.online = on.has(a.id); });
+        return enviarPara(id, { tipo: "resultadoBusca", lista });
+      }
+      case "enviarPedidoAmizade": {
+        c.jogadorId = msg.jogadorId || c.jogadorId || null;
+        if (!contas || !c.jogadorId) return enviarPara(id, { tipo: "erro", motivo: "faça login pra adicionar amigos" });
+        contas.obterOuCriar(c.jogadorId, msg.apelido);
+        const r = contas.enviarPedido(c.jogadorId, msg.alvo);
+        if (r.erro) return enviarPara(id, { tipo: "erro", motivo: r.erro });
+        if (r.aceitou) enviarPara(id, { tipo: "pedidoAmizadeRespondido", aceitou: true, amigoApelido: r.amigoApelido });
+        else enviarPara(id, { tipo: "pedidoAmizadeEnviado", paraApelido: r.paraApelido });
+        enviarPara(id, { tipo: "amigosAtualizar" });        // atualiza a minha própria lista
+        enviarParaJogador(msg.alvo, { tipo: "amigosAtualizar" }); // e a do outro, se online
+        return;
+      }
+      case "responderPedidoAmizade": {
+        c.jogadorId = msg.jogadorId || c.jogadorId || null;
+        if (!contas || !c.jogadorId) return enviarPara(id, { tipo: "erro", motivo: "faça login" });
+        const r = contas.responderPedido(c.jogadorId, msg.deId, msg.aceitar);
+        if (r.erro) return enviarPara(id, { tipo: "erro", motivo: r.erro });
+        enviarPara(id, { tipo: "pedidoAmizadeRespondido", aceitou: r.aceitou, amigoApelido: r.amigoApelido });
+        enviarPara(id, { tipo: "amigosAtualizar" });
+        enviarParaJogador(msg.deId, { tipo: "amigosAtualizar" });
+        return;
+      }
+      case "listarAmigos": {
+        c.jogadorId = msg.jogadorId || c.jogadorId || null;
+        if (!contas || !c.jogadorId) return enviarPara(id, { tipo: "amigos", meuCodigo: null, amigos: [], pedidosRecebidos: [], pedidosEnviados: [] });
+        contas.obterOuCriar(c.jogadorId, msg.apelido);
+        return enviarPara(id, Object.assign({ tipo: "amigos" }, contas.estadoAmigos(c.jogadorId, jogadoresOnline())));
+      }
       case "iniciarPartida": {
         if (c.codigo == null) return enviarPara(id, { tipo: "erro", motivo: "você não está numa mesa" });
         const r = ger.iniciarPartida({ codigo: c.codigo, assento: c.assento });
@@ -5260,10 +5397,40 @@ function criarServidor(opts = {}) {
       case "sair": {
         if (c.codigo != null) {
           const cod = c.codigo;
+          const salaS = ger.salas[cod];
+          const tinhaRev = !!(salaS && salaS.revanche && salaS.revanche.ativa);
+          const apelS = (salaS && salaS.jogo && salaS.jogo.assentos[c.assento]) ? salaS.jogo.assentos[c.assento].apelido : "Um jogador";
           ger.sair({ codigo: cod, assento: c.assento });
           c.codigo = null; c.assento = null;
-          broadcastSala(cod);
+          if (tinhaRev) cancelarRevanche(cod, "saiu", apelS);
+          else broadcastSala(cod);
         }
+        return;
+      }
+      // ===== REVANCHE ("Vamos outra?") =====
+      case "revancheVoto": {
+        // o jogador topou jogar de novo. Marca o voto do assento dele e avisa a mesa;
+        // quando os 4 assentos toparem, redistribui uma partida nova na mesma mesa.
+        if (c.codigo == null) return;
+        const sala = ger.salas[c.codigo];
+        if (!sala || !sala.revanche || !sala.revanche.ativa) return;
+        sala.revanche.votos[c.assento] = true;
+        broadcastRevanche(c.codigo);
+        if ([0, 1, 2, 3].every((i) => sala.revanche.votos[i])) reiniciarRevanche(c.codigo);
+        return;
+      }
+      case "revancheSair": {
+        // o jogador não topou: sai da mesa e, com isso, a mesa não continua pra ninguém
+        // (os outros "vão atrás" — pedido Sônia).
+        if (c.codigo == null) return;
+        const cod = c.codigo;
+        const sala = ger.salas[cod];
+        const apel = (sala && sala.jogo && sala.jogo.assentos[c.assento]) ? sala.jogo.assentos[c.assento].apelido : "Um jogador";
+        // tira o jogador da mesa ANTES de avisar — assim quem saiu não recebe o
+        // aviso "fulano saiu" (foi ele mesmo; no cliente já vai pro menu na hora).
+        ger.sair({ codigo: cod, assento: c.assento });
+        c.codigo = null; c.assento = null;
+        cancelarRevanche(cod, "saiu", apel);
         return;
       }
       default:
@@ -5293,12 +5460,70 @@ function criarServidor(opts = {}) {
     if (!sala || !sala.resumoFinal || sala.fimEmitido) return;
     sala.fimEmitido = true;
     const placar = sala.jogo && sala.jogo.placar;
+    // REVANCHE: só rola se a mesa for 100% humana (nenhum robô). Abre a janela de
+    // 3 min e manda os perfis dos 4 pra tela "Vamos outra?".
+    const revanchePossivel = ger.podeRevanche(codigo);
+    if (revanchePossivel) iniciarRevanche(codigo);
+    const perfis = revanchePossivel ? ger.perfilAssentos(codigo) : null;
     for (const cid in conexoes) {
       const c = conexoes[cid];
       if (c.codigo === codigo && c.assento != null) {
-        c.enviar({ tipo: "fim", resumo: sala.resumoFinal, placar });
+        const rev = revanchePossivel
+          ? { possivel: true, ms: revancheMs, assentos: perfis, meuAssento: c.assento }
+          : { possivel: false };
+        c.enviar({ tipo: "fim", resumo: sala.resumoFinal, placar, revanche: rev });
       }
     }
+    if (revanchePossivel) broadcastRevanche(codigo);
+  }
+
+  // ---- REVANCHE: coordenação dos votos + timer de 3 min + reinício/cancelamento ----
+  function conexoesDaSala(codigo) {
+    const arr = [];
+    for (const cid in conexoes) { const c = conexoes[cid]; if (c.codigo === codigo && c.assento != null) arr.push(c); }
+    return arr;
+  }
+  function iniciarRevanche(codigo) {
+    const sala = ger.salas[codigo];
+    if (!sala || !ger.podeRevanche(codigo)) return;
+    const deadline = Date.now() + revancheMs;
+    const rev = { ativa: true, votos: {}, deadline, timer: null };
+    rev.timer = agendarTempo(function () { cancelarRevanche(codigo, "tempo"); }, revancheMs);
+    sala.revanche = rev;
+  }
+  function limparRevanche(sala) {
+    if (sala && sala.revanche) {
+      if (sala.revanche.timer != null) { try { cancelarTempo(sala.revanche.timer); } catch (e) {} }
+      sala.revanche.ativa = false;
+      sala.revanche = null;
+    }
+  }
+  function broadcastRevanche(codigo) {
+    const sala = ger.salas[codigo];
+    if (!sala || !sala.revanche || !sala.revanche.ativa) return;
+    const rev = sala.revanche;
+    const votos = [0, 1, 2, 3].map((i) => !!rev.votos[i]);
+    const restanteMs = Math.max(0, rev.deadline - Date.now());
+    for (const c of conexoesDaSala(codigo)) {
+      c.enviar({ tipo: "revancheEstado", votos, restanteMs, deadline: rev.deadline, meuAssento: c.assento });
+    }
+  }
+  function cancelarRevanche(codigo, motivo, apelidoQuemSaiu) {
+    const sala = ger.salas[codigo];
+    if (!sala || !sala.revanche || !sala.revanche.ativa) return;
+    limparRevanche(sala);
+    for (const c of conexoesDaSala(codigo)) {
+      c.enviar({ tipo: "revancheCancelada", motivo: motivo, apelido: apelidoQuemSaiu || null });
+    }
+  }
+  function reiniciarRevanche(codigo) {
+    const sala = ger.salas[codigo];
+    if (!sala) return;
+    limparRevanche(sala);
+    sala.fimEmitido = false; // a próxima partida pode emitir "fim" de novo
+    const r = ger.reiniciarMesa(codigo);
+    if (r && r.erro) return;
+    avancarComRespiro(codigo); // desenha o estado NOVO (o cliente fecha o overlay e joga)
   }
 
   /** Manda pra cada conexão da sala a SUA visão (por assento). É o "tempo real":
@@ -5313,7 +5538,9 @@ function criarServidor(opts = {}) {
     }
   }
 
-  return { conectar, desconectar, processar, broadcastSala, ger, conexoes };
+  // _teste: ganchos internos usados só pelos testes (forçar o fim pra exercitar a
+  // revanche sem precisar jogar uma partida inteira). Não muda o comportamento.
+  return { conectar, desconectar, processar, broadcastSala, ger, conexoes, _teste: { emitirFimSeAcabou } };
 }
 
 module.exports = { criarServidor };
@@ -8327,7 +8554,7 @@ module.exports = { criarServidor };
       // realce visual: dourado comemorativo na vitória, apagado na derrota
       var fimCardEl = overlay.querySelector(".fim-card");
       if (fimCardEl) { fimCardEl.classList.toggle("venceu-online", venceuNos); fimCardEl.classList.toggle("perdeu-online", !venceuNos); }
-      btnEl.textContent = venceuNos ? "🎉 Nova partida" : "Nova partida";
+      btnEl.textContent = __ehTreino ? "🔄 Jogar de novo" : (venceuNos ? "🎉 Nova partida" : "Nova partida");
       btnEl.dataset.acao = "nova-partida";
       if (typeof playFanfarraVitoria === "function" && typeof playSomDerrota === "function") {
         if (venceuNos) { playFanfarraVitoria(); if (typeof soltarConfetes === "function") { soltarConfetes(); setTimeout(soltarConfetes, 700); } }
@@ -8359,8 +8586,132 @@ module.exports = { criarServidor };
   // de fundo); "nova partida" recarrega a página (reinicia tudo do zero).
   function __fecharFimOnline(acao) {
     var overlay = document.getElementById("fim-overlay");
+    if (acao === "revanche") { if (overlay) overlay.classList.remove("show"); __abrirRevanche(); return; }
     if (overlay) overlay.classList.remove("show");
+    // TREINO / mesa com robô: "Jogar de novo" recarrega (cai direto numa mesa nova)
     if (acao === "nova-partida") location.reload();
+  }
+
+  // ============================================================
+  // REVANCHE ("Vamos outra?") — pedido Sônia 23/jul.
+  // No fim de uma mesa 100% humana, depois da contagem de pontos, aparece a tela
+  // com o perfil dos 4 jogadores + botões "Vamos jogar?" e "Sair". Quem topa mostra
+  // o balão "vamos outra?"; se os 4 topam, a MESMA mesa recomeça. Se alguém sai (ou
+  // o tempo de 3 min zera), a mesa não continua e todos voltam ao menu.
+  // ============================================================
+  function __escaparHTML(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+    });
+  }
+  function __irParaMenu() {
+    try { if (__srv && __srv.fechar) __srv.fechar(); } catch (e) {}
+    location.href = "app.html";
+  }
+  // botão do overlay de fim vira "Vamos outra?"; auto-abre a tela de revanche em
+  // seguida (o timer de 3 min do servidor já está correndo — dá tempo do anúncio).
+  function __prepararRevanche() {
+    var btn = document.getElementById("fim-btn");
+    if (btn) { btn.textContent = "Vamos outra? 🃏"; btn.dataset.acao = "revanche"; }
+    clearTimeout(__revAutoAbrir);
+    __revAutoAbrir = setTimeout(function () {
+      var ov = document.getElementById("fim-overlay");
+      if (ov && ov.classList.contains("show")) __fecharFimOnline("revanche"); // só se ainda na contagem
+    }, 4200);
+  }
+  function __cardRevanche(p, ehVoce) {
+    var url = __avatarUrlDe(p);
+    var ini = ((p.apelido || "?").trim().charAt(0) || "?").toUpperCase();
+    var foto = url ? '<img src="' + url + '" alt="">' : '<span class="__rv-ini">' + __escaparHTML(ini) + '</span>';
+    var nos = p.dupla === "nos";
+    return '<div class="__rv-p" data-assento="' + p.assento + '">' +
+      '<div class="__rv-balao" id="__rv-balao-' + p.assento + '">vamos outra?</div>' +
+      '<div class="__rv-av">' + foto + '</div>' +
+      '<div class="__rv-nome">' + __escaparHTML(p.apelido || "jogador") + (ehVoce ? ' <b>(você)</b>' : '') + '</div>' +
+      '<span class="__rv-time ' + (nos ? "__t-nos" : "__t-eles") + '">' + (nos ? "NÓS" : "ELES") + '</span>' +
+    '</div>';
+  }
+  function __abrirRevanche() {
+    if (!__revanche) return;
+    var ov = document.getElementById("__revanche-overlay");
+    if (!ov) { ov = document.createElement("div"); ov.id = "__revanche-overlay"; document.body.appendChild(ov); }
+    var meu = __revanche.meuAssento;
+    var cards = (__revanche.assentos || []).map(function (p) { return __cardRevanche(p, p.assento === meu); }).join("");
+    ov.innerHTML =
+      '<div class="__rv-card">' +
+        '<div class="__rv-tit">Vamos outra? 🃏</div>' +
+        '<div class="__rv-sub">todo mundo precisa topar pra mesa continuar</div>' +
+        '<div class="__rv-grid">' + cards + '</div>' +
+        '<div class="__rv-cron-wrap">⏳ <span id="__rv-cron">3:00</span> pra decidir</div>' +
+        '<div class="__rv-ad" id="__rv-ad"><span>📺 espaço reservado pro anúncio</span></div>' +
+        '<div class="__rv-acoes">' +
+          '<button class="__lb-btn" id="__rv-topar">✋ Vamos jogar?</button>' +
+          '<button class="__rv-sair" id="__rv-sair">🚪 Sair</button>' +
+        '</div>' +
+      '</div>';
+    ov.style.display = "flex";
+    var bt = document.getElementById("__rv-topar");
+    bt.onclick = function () {
+      __enviarMsg({ tipo: "revancheVoto" });
+      bt.disabled = true; bt.textContent = "✓ Você topou! aguardando os outros…";
+    };
+    document.getElementById("__rv-sair").onclick = function () {
+      __enviarMsg({ tipo: "revancheSair" });
+      __irParaMenu();
+    };
+    __iniciarCronRevanche();
+    if (__revVotos) __atualizarRevanche({ votos: __revVotos }); // aplica votos já chegados
+  }
+  function __iniciarCronRevanche() {
+    if (__revInterval) clearInterval(__revInterval);
+    function tick() {
+      var rest = Math.max(0, __revDeadline - Date.now());
+      var el = document.getElementById("__rv-cron");
+      if (el) { var m = Math.floor(rest / 60000), s = Math.floor((rest % 60000) / 1000); el.textContent = m + ":" + (s < 10 ? "0" : "") + s; }
+      if (rest <= 0) { clearInterval(__revInterval); __revInterval = null; }
+    }
+    tick();
+    __revInterval = setInterval(tick, 1000);
+  }
+  function __atualizarRevanche(msg) {
+    __revVotos = msg.votos || __revVotos;
+    var ov = document.getElementById("__revanche-overlay");
+    if (!ov || ov.style.display === "none" || !__revVotos) return;
+    for (var i = 0; i < 4; i++) {
+      var balao = document.getElementById("__rv-balao-" + i);
+      var pc = ov.querySelector('.__rv-p[data-assento="' + i + '"]');
+      if (balao) balao.classList.toggle("show", !!__revVotos[i]);
+      if (pc) pc.classList.toggle("__rv-topou", !!__revVotos[i]);
+    }
+  }
+  function __revancheCancelada(msg) {
+    if (__revInterval) { clearInterval(__revInterval); __revInterval = null; }
+    clearTimeout(__revAutoAbrir);
+    var fim = document.getElementById("fim-overlay"); if (fim) fim.classList.remove("show");
+    var ov = document.getElementById("__revanche-overlay");
+    if (!ov) { ov = document.createElement("div"); ov.id = "__revanche-overlay"; document.body.appendChild(ov); }
+    var motivo = (msg && msg.motivo === "tempo")
+      ? "O tempo acabou e nem todo mundo topou. A mesa foi encerrada."
+      : (((msg && msg.apelido) || "Um jogador") + " saiu — a mesa não vai continuar.");
+    ov.innerHTML =
+      '<div class="__rv-card">' +
+        '<div class="__rv-tit">Fim de mesa 👋</div>' +
+        '<div class="__rv-sub" style="margin:10px 4px 18px;font-size:13px">' + __escaparHTML(motivo) + '</div>' +
+        '<div class="__rv-sub">voltando ao menu…</div>' +
+      '</div>';
+    ov.style.display = "flex";
+    setTimeout(__irParaMenu, 2600);
+  }
+  // fecha as telas de fim + revanche quando uma partida NOVA começa (revanche aceita)
+  function __fecharRevancheEFim() {
+    var rv = document.getElementById("__revanche-overlay");
+    var fim = document.getElementById("fim-overlay");
+    var mudou = false;
+    if (rv && rv.style.display !== "none") { rv.style.display = "none"; mudou = true; }
+    if (fim && fim.classList.contains("show")) { fim.classList.remove("show"); mudou = true; }
+    if (__revInterval) { clearInterval(__revInterval); __revInterval = null; }
+    clearTimeout(__revAutoAbrir);
+    if (mudou) { __ultimaRodadaMostrada = -1; __revanche = null; __revVotos = null; }
   }
 
   function iniciarOnline() {
@@ -8385,6 +8736,7 @@ module.exports = { criarServidor };
     if (!self.ServidorBuraco) { hintEl.textContent = "servidor não carregou"; return; }
     if (__treino) {
       // cai direto na mesa de treino (robôs), sem tela de escolha
+      __ehTreino = true; // fim de jogo → botão "Jogar de novo" (sem revanche, tem robô)
       MODALIDADE = "aberto"; PONTUACAO_ALVO = 3000;
       try { atualizarPlacaresDOM(); } catch (e) {}
       __srv = self.ServidorBuraco.criarServidor({ agendar: function (fn) { setTimeout(fn, 2500); } });
@@ -8427,6 +8779,10 @@ module.exports = { criarServidor };
 
   var __codigoMesa = null, __modoLobbyUI = false, __apelidoJogador = "Você";
   var __fimResumo = null; // resumo de ganhos da última partida (msg "fim")
+  var __ehTreino = false;  // mesa de treino (robôs) → botão "Jogar de novo", sem revanche
+  // ===== REVANCHE ("Vamos outra?") — pedido Sônia 23/jul =====
+  var __revanche = null;   // { possivel, ms, assentos:[...], meuAssento }
+  var __revVotos = null, __revDeadline = 0, __revInterval = null, __revAutoAbrir = null;
 
   // injeta os ganhos ("🪙 +50 · ⭐ +160 XP · subiu de nível!") no overlay de fim
   // de partida. Chamado quando a mensagem "fim" chega (logo após o estado que
@@ -8481,12 +8837,24 @@ module.exports = { criarServidor };
       if (v.metaPontos) PONTUACAO_ALVO = v.metaPontos;
       try { atualizarPlacaresDOM(); } catch (e) {}
       __fecharOverlayModo();
+      // REVANCHE aceita por todos: chegou uma partida NOVA (não encerrada) — fecha
+      // as telas de fim/revanche e volta a jogar na mesma mesa.
+      if (v && !v.encerrada && !v.rodadaEncerrada) __fecharRevancheEFim();
       __V = v; __sincronizar(v);
       return;
     }
     // FIM DA PARTIDA (dados reais): o servidor mandou os ganhos do cofre. Guarda
     // e injeta no overlay de fim (que o estado 'encerrada' já abriu logo antes).
-    if (msg.tipo === "fim") { __fimResumo = msg.resumo; __mostrarRecompensaFim(); return; }
+    if (msg.tipo === "fim") {
+      __fimResumo = msg.resumo; __mostrarRecompensaFim();
+      // REVANCHE: mesa 100% humana → depois da contagem, aparece "Vamos outra?"
+      if (msg.revanche && msg.revanche.possivel) { __revanche = msg.revanche; __prepararRevanche(); }
+      return;
+    }
+    // REVANCHE: atualização dos votos (balões) + relógio compartilhado
+    if (msg.tipo === "revancheEstado") { if (msg.deadline) __revDeadline = msg.deadline; __atualizarRevanche(msg); return; }
+    // REVANCHE cancelada (alguém saiu ou o tempo acabou) → avisa e volta ao menu
+    if (msg.tipo === "revancheCancelada") { __revancheCancelada(msg); return; }
   }
   function __fecharOverlayModo() {
     var ov = document.getElementById("__modo-overlay");
